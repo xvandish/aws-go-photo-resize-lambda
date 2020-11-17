@@ -1,0 +1,1 @@
+# aws-go-photo-resize-lambda
