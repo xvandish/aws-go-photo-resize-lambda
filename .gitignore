@@ -4,6 +4,10 @@
 *.dll
 *.so
 *.dylib
+*main
+
+# Zip for aws
+function.zip
 
 # Test binary, built with `go test -c`
 *.test

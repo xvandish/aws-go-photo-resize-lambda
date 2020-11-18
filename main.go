@@ -89,7 +89,7 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 		for _, size := range defaultPhotoSizes {
 			log.Printf("Image: %s - Creating size: %v\n", srcKey, size)
 			newImage := imaging.Resize(img, size.Width, 0, imaging.Lanczos)
-			newName := fileWithoutExtension + size.Suffix
+			newName := fileWithoutExtension + size.Suffix + fileExt
 			newBuf := new(bytes.Buffer)
 			err := jpeg.Encode(newBuf, newImage, nil)
 
