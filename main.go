@@ -27,19 +27,19 @@ type PhotoSize struct {
 var defaultPhotoSizes = []PhotoSize{
 	PhotoSize{
 		Width:  333,
-		Suffix: ".jpg",
+		Suffix: "",
 	},
 	PhotoSize{
 		Width:  667,
-		Suffix: "@2x.jpg",
+		Suffix: "@2x",
 	},
 	PhotoSize{
 		Width:  1500,
-		Suffix: "_large.jpg",
+		Suffix: "_large",
 	},
 	PhotoSize{
 		Width:  3000,
-		Suffix: "_large@2x.jpg",
+		Suffix: "_large",
 	},
 }
 
