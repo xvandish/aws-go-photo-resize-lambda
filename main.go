@@ -91,11 +91,13 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 		wg.Add(len(defaultPhotoSizes))
 
 		for _, size := range defaultPhotoSizes {
-			go func(currSize *PhotoSize) {
+			size := size
+			go func() {
+				log.Printf("size in go func is %v", size)
 				defer wg.Done()
-				resizedImage := resizeImage(&img, currSize)
-				encodeImageAndUploadToS3(resizedImage, fileWithoutExtension, fileExt, currSize.Suffix, s3uploader)
-			}(&size)
+				resizedImage := resizeImage(&img, &size)
+				encodeImageAndUploadToS3(resizedImage, fileWithoutExtension, fileExt, size.Suffix, s3uploader)
+			}()
 		}
 		wg.Wait()
 		log.Printf("Resized all images for %s", srcKey)
