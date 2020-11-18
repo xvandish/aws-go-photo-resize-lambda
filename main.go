@@ -39,7 +39,7 @@ var defaultPhotoSizes = []PhotoSize{
 	},
 	PhotoSize{
 		Width:  3000,
-		Suffix: "_large",
+		Suffix: "_large@2x",
 	},
 }
 
