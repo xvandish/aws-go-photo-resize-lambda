@@ -1,7 +1,6 @@
 package main
 
 import (
-	//"context"
 	"bytes"
 	"context"
 	"log"
@@ -9,10 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	//"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -106,11 +104,6 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 	return "Succesfully processed req", nil
 }
 
-func timeTrack(start time.Time, name string) {
-	elapsed := time.Since(start)
-	log.Printf("function %s took %s", name, elapsed)
-}
-
 func getImageNameAndExt(imgPath string) (string, string) {
 	fileExt := filepath.Ext(imgPath)
 	fileWithoutExtension := strings.TrimSuffix(imgPath, fileExt)
@@ -145,35 +138,6 @@ func encodeImageAndUploadToS3(img []byte, imgName string, imgExt string, newSize
 	log.Printf("Uploaded %s successfully to %s\n", s3Key, res.Location)
 }
 
-func testLocaly() {
-	// Open a file in this directory
-	defer timeTrack(time.Now(), "testLocally")
-	buffer, err := bimg.Read("./snow_mountain_brandur.jpg")
-	if err != nil {
-		log.Printf("%v", err)
-	}
-
-	var wg sync.WaitGroup
-	wg.Add(len(defaultPhotoSizes))
-
-	for _, size := range defaultPhotoSizes {
-		size := size
-		go func() {
-			//defer timeTrack(time.Now(), "go("+size.Suffix+")")
-			log.Printf("size in go func is %v", size)
-			defer wg.Done()
-			resizedImage, err := resizeImage(&buffer, &size)
-			if err != nil {
-				return
-			}
-			bimg.Write("snow_mountain_brandur"+size.Suffix+".jpg", resizedImage)
-		}()
-	}
-	wg.Wait()
-	log.Printf("Resized all images for snow")
-}
-
 func main() {
-	//lambda.Start(HandleRequest)
-	testLocaly()
+	lambda.Start(HandleRequest)
 }
