@@ -3,6 +3,7 @@ package main
 import (
 	//"context"
 	"bytes"
+	"context"
 	"image/jpeg"
 	"log"
 	"os"
@@ -44,7 +45,7 @@ var defaultPhotoSizes = []PhotoSize{
 
 //This lambda will only be called on CREATE object events
 
-func HandleRequest(_, event events.S3Event) (string, error) {
+func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 
 	// Even if multiple events are sent, should be from same src
 	// Maybe later spin off a concurrent function for every record
@@ -97,9 +98,10 @@ func HandleRequest(_, event events.S3Event) (string, error) {
 			}
 
 			res, err := s3uploader.Upload(&s3manager.UploadInput{
-				Body:   bytes.NewReader(newBuf.Bytes()),
-				Bucket: aws.String(os.Getenv("RESIZED_PHOTOS_BUCKET")),
-				Key:    &newName,
+				Body:        bytes.NewReader(newBuf.Bytes()),
+				Bucket:      aws.String(os.Getenv("RESIZED_PHOTOS_BUCKET")),
+				Key:         &newName,
+				ContentType: aws.String("image/jpeg"),
 			})
 
 			if err != nil {
