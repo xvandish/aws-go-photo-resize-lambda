@@ -4,11 +4,13 @@ import (
 	//"context"
 	"bytes"
 	"context"
+	"image"
 	"image/jpeg"
 	"log"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -56,12 +58,14 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 
 		if err != nil {
 			log.Printf("Could not instantiate s3 session")
+			return "", err
 		}
 
 		// Should I add the bucket names as env vars
 		// or define them here somehow
 		srcBucket := record.S3.Bucket.Name
 		srcKey := record.S3.Object.Key
+		fileWithoutExtension, fileExt := getImageNameAndExt(srcKey)
 
 		photoBuff := aws.WriteAtBuffer{} // Store the picture to memory
 		s3downloader := s3manager.NewDownloader(s3Ses)
@@ -72,65 +76,82 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 
 		if err != nil {
 			log.Printf("Could not download %s from bucket %s", srcKey, srcBucket)
+			return "", err
 		}
 
-		imageBytes := photoBuff.Bytes()
-		reader := bytes.NewReader(imageBytes)
-		img, err := jpeg.Decode(reader)
+		img, err := decodeImageFromBytes(&photoBuff, fileWithoutExtension)
 
 		if err != nil {
 			log.Printf("Could not decode downloaded image %s", srcKey)
+			return "", err
 		}
 
-		fileExt := filepath.Ext(srcKey)
-		fileWithoutExtension := strings.TrimSuffix(srcKey, fileExt)
 		s3uploader := s3manager.NewUploader(s3Ses)
+		var wg sync.WaitGroup
+		wg.Add(len(defaultPhotoSizes))
 
 		for _, size := range defaultPhotoSizes {
-			log.Printf("Image: %s - Creating size: %v\n", srcKey, size)
-			newImage := imaging.Resize(img, size.Width, 0, imaging.Lanczos)
-			newName := fileWithoutExtension + size.Suffix + fileExt
-			newBuf := new(bytes.Buffer)
-			err := jpeg.Encode(newBuf, newImage, nil)
-
-			if err != nil {
-				log.Printf("Error encoding image to buffer: %v\n", err)
-			}
-
-			res, err := s3uploader.Upload(&s3manager.UploadInput{
-				Body:        bytes.NewReader(newBuf.Bytes()),
-				Bucket:      aws.String(os.Getenv("RESIZED_PHOTOS_BUCKET")),
-				Key:         &newName,
-				ContentType: aws.String("image/jpeg"),
-			})
-
-			if err != nil {
-				log.Printf("Failed to upload %s\n", newName)
-			}
-
-			log.Printf("Uploaded %s successfully to %s\n", newName, res.Location)
+			go func(currSize *PhotoSize) {
+				defer wg.Done()
+				resizedImage := resizeImage(&img, currSize)
+				encodeImageAndUploadToS3(resizedImage, fileWithoutExtension, fileExt, currSize.Suffix, s3uploader)
+			}(&size)
 		}
+		wg.Wait()
+		log.Printf("Resized all images for %s", srcKey)
 	}
 	return "Succesfully processed req", nil
 }
 
-// This works and does what I want so we're mostly good
-//func testThis() {
-//src, err := imaging.Open("gardens_by_the_bay_brandur.jpg")
-//if err != nil {
-//log.Fatalf("failed to open image: %v\n", err)
-//}
+func getImageNameAndExt(imgPath string) (string, string) {
+	fileExt := filepath.Ext(imgPath)
+	fileWithoutExtension := strings.TrimSuffix(imgPath, fileExt)
+	return fileWithoutExtension, fileExt
+}
 
-//for _, size := range defaultPhotoSizes {
-//fmt.Sprint("Creating size: %v\n", size)
-//newImage := imaging.Resize(src, size.Width, 0, imaging.Lanczos) // height as 0 preserves aspect ratio
-//newPath := "gardens_by_the_bay_brandur" + size.Suffix
-//err = imaging.Save(newImage, newPath)
-//if err != nil {
-//log.Fatalf("Failed to save image %v", err)
-//}
-//}
-//}
+func decodeImageFromBytes(photoBuff *aws.WriteAtBuffer, imageName string) (image.Image, error) {
+	// Get the bytes from the buffer and decode into image
+	imageBytes := photoBuff.Bytes()
+	reader := bytes.NewReader(imageBytes)
+	decodedImg, err := jpeg.Decode(reader)
+
+	if err != nil {
+		log.Printf("Could not decode downloaded image %s", imageName)
+		return nil, err
+	}
+
+	return decodedImg, nil
+}
+
+func resizeImage(img *image.Image, requestedSize *PhotoSize) *image.NRGBA {
+	return imaging.Resize(*img, requestedSize.Width, 0, imaging.Lanczos)
+}
+
+func encodeImageAndUploadToS3(img *image.NRGBA, imgName string, imgExt string, newSizeSuffix string, s3uploader *s3manager.Uploader) {
+	s3Key := imgName + newSizeSuffix + imgExt
+
+	newBuf := new(bytes.Buffer)
+	err := jpeg.Encode(newBuf, img, nil)
+
+	if err != nil {
+		log.Printf("Error encoding image to buffer: %v\n", err)
+		return
+	}
+
+	res, err := s3uploader.Upload(&s3manager.UploadInput{
+		Body:        bytes.NewReader(newBuf.Bytes()),
+		Bucket:      aws.String(os.Getenv("RESIZED_PHOTOS_BUCKET")),
+		Key:         &s3Key,
+		ContentType: aws.String("image/jpeg"),
+	})
+
+	if err != nil {
+		log.Printf("Failed to upload %s\n", s3Key)
+		return
+	}
+
+	log.Printf("Uploaded %s successfully to %s\n", s3Key, res.Location)
+}
 
 func main() {
 	lambda.Start(HandleRequest)
