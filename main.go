@@ -54,7 +54,7 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 		})
 
 		if err != nil {
-			log.Printf("Could not instantiate s3 session")
+			log.Printf("Could not instantiate s3 session %v", err)
 			return "", err
 		}
 
@@ -72,12 +72,12 @@ func HandleRequest(ctx context.Context, event events.S3Event) (string, error) {
 		})
 
 		if err != nil {
-			log.Printf("Could not download %s from bucket %s", srcKey, srcBucket)
+			log.Printf("Could not download %s from bucket %s %v", srcKey, srcBucket, err)
 			return "", err
 		}
 
 		if err != nil {
-			log.Printf("Could not decode downloaded image %s", srcKey)
+			log.Printf("Could not decode downloaded image %s %v", srcKey, err)
 			return "", err
 		}
 
@@ -114,7 +114,7 @@ func resizeImage(imgBytes *[]byte, requestedSize *PhotoSize) ([]byte, error) {
 	newImg, err := bimg.NewImage(*imgBytes).Resize(requestedSize.Width, 0)
 
 	if err != nil {
-		log.Printf("Could not create image from byte[]")
+		log.Printf("Could not resize image %v", err)
 		return nil, err
 	}
 	return newImg, nil
@@ -131,7 +131,7 @@ func encodeImageAndUploadToS3(img []byte, imgName string, imgExt string, newSize
 	})
 
 	if err != nil {
-		log.Printf("Failed to upload %s\n", s3Key)
+		log.Printf("Failed to upload %s\n %v", s3Key, err)
 		return
 	}
 
