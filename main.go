@@ -111,8 +111,9 @@ func getImageNameAndExt(imgPath string) (string, string) {
 }
 
 func resizeImage(imgBytes *[]byte, requestedSize *PhotoSize) ([]byte, error) {
-	newImg, err := bimg.NewImage(*imgBytes).Resize(requestedSize.Width, 0)
+	//newImg, err := bimg.NewImage(*imgBytes).Resize(requestedSize.Width, 0)
 
+	newImg, err := bimg.Resize(*imgBytes, bimg.Options{Width: requestedSize.Width, Force: true, NoAutoRotate: true})
 	if err != nil {
 		log.Printf("Could not create image from byte[]")
 		return nil, err
